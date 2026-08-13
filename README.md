@@ -1,212 +1,156 @@
-# Pad-Foundation-Python
-Pad Foundation Open Source Calculator Using Python
-# Pad Foundation Design Calculator — User Instructions
+# FoundationDesign
 
-## 1. Purpose
+[![PyPi](https://img.shields.io/pypi/v/FoundationDesign.svg)](https://pypi.org/project/FoundationDesign/)
+![PyPI - License](https://img.shields.io/pypi/l/FoundationDesign)
+[![Downloads](https://static.pepy.tech/badge/foundationdesign)](https://pepy.tech/project/foundationdesign)
+[![Downloads](https://static.pepy.tech/badge/foundationdesign/month)](https://pepy.tech/project/foundationdesign)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/FoundationDesign)
+[![build & test](https://github.com/kunle009/FoundationDesign/actions/workflows/build-and-test.yml/badge.svg?branch=main)](https://github.com/kunle009/FoundationDesign/actions/workflows/build-and-test.yml)
+[![Documentation Status](https://readthedocs.org/projects/foundationdesign/badge/?version=latest)](https://foundationdesign.readthedocs.io/en/latest/?badge=latest)
+[![Code style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/format.json)](https://github.com/charliermarsh/ruff)
+[![Webapp](https://img.shields.io/website?url=https%3A%2F%2Ffoundationcalcs.com)](https://foundationcalcs.com)
 
-The program analyses and designs an isolated rectangular reinforced-concrete pad
-foundation. It reports bearing, flexural reinforcement, one-way shear, punching
-shear, and sliding checks, together with analytical calculations and reinforcement
-drawings.
+🚀 **Exciting Update**: The [FoundationCalcs](https://foundationcalcs.com) website is now live for beta testing! The platform allows you design foundations and download comprehensive pdf report. You can access the pad foundation calculator [here](https://foundationcalcs.com/pad_foundation_calculator) and start interacting with this library via a web UI. Your feedback is important to improve the core library and the web platform.
 
-The program is a design aid. Input actions and soil parameters must be supplied or
-verified by suitably qualified structural and geotechnical engineers.
+---
 
-### Software basis and GUI
+FoundationDesign is a python module to be used for the design and analysis
+of different foundation types in accordance to the Eurocode 2.
+This project is an attempt to have a free standalone python package that can
+be used to analyse and design foundations with results as good as paid softwares.
+This module will be useful in determining:
 
-The principal foundation-analysis and design modules used by this program originate
-from the open-source
-[FoundationDesign project by kunle009](https://github.com/kunle009/FoundationDesign).
+- The critical bending moments in the foundation
+- Critical shear force in the foundation
+- Transverse shear check of the foundation
+- Sliding checks
+- Crack width checks
+- Reinforcement provisions
+- Punching shear checks etc
 
-This program adds a graphical user interface (GUI) in `pad_foundation_gui.py` to
-facilitate data entry, presentation of design results and analytical calculations,
-and generation of foundation-layout, section, and reinforcement graphics.
+The project is based mainly on instructions contained in the Eurocode 2
+alongside python packages like numpy,plotly,scipy and IndeterminateBeam package. Comprehensive
+examples are contained in the examples folder.
+The full package documentation can be accessed [here](http://foundationdesign.readthedocs.io/).
 
-## 2. Starting the program
+Text-based examples of the package presented in the [documentation](http://foundationdesign.readthedocs.io/en/latest/examples.html) includes [Concentric Pad Foundation](https://colab.research.google.com/github/kunle009/FoundationDesign/blob/main/examples/Concentric_Footing_Example.ipynb), [Eccentric Pad Foundation](https://colab.research.google.com/github/kunle009/FoundationDesign/blob/main/examples/Eccentric_Footing_Example.ipynb) and a [Combined Footing Pad Foundation](https://colab.research.google.com/github/kunle009/FoundationDesign/blob/main/examples/Combined_Footing_Mosley_bungey.ipynb). A web-based graphical user interface (GUI) is currently in development.
 
-For the packaged Windows version, open the `dist` directory and double-click
-`FoundationDesign.exe`.
+## Project Purpose
 
-Full location:
+1. Create a free python package that can analyse and design pad foundation,combined footing foundation,
+   pile foundation and raft foundation design.
 
-```text
-D:\KostasMy\MySite\programming\civils.ai\FoundationDesign-main\dist\FoundationDesign.exe
-```
+2. Create a comprehensive web app for the structural design of foundations.
 
-To run from Python, open PowerShell in the project directory and enter:
+## Functionality and usage
 
-```powershell
-.\.venv\Scripts\python.exe pad_foundation_gui.py
-```
+For now this package is limited to only concentric and eccentric pad foundation and combined footing foundation types.
+A typical use case of the pad foundation class contained in the `FoundationDesign` module includes
 
-## 3. Recommended workflow
+- Create a `PadFoundation` object to help analyse
+- Assign `foundation_loads` to the `PadFoundation`
+- Assign `column_axial_loads` to the `PadFoundation`
+- Assign `column_horizontal_loads_xdir` to the `PadFoundation`
+- Assign `column_horizontal_loads_xdir` to the `PadFoundation`
+- Assign `column_moments_xdir` to the `PadFoundation`
+- Assign `column_moments_ydir` to the `PadFoundation`
+- Check the `minimum_area_required` for the `PadFoundation`
+- Check the `bearing_pressure_check_sls` on the `PadFoundation`
+- Create a `PadFoundationDesign` object to help design the foundation
+- Plot the Bending moment and shear force diagrams
+- Check the area of steel required and provided in x and y direction
+- Check the adequacy of the transverse shear along both column_axial_loads
+- Check for `punching_shear_column_face` on the `PadFoundationDesign` object
+- Check for `punching_shear_check_1d` on the `PadFoundationDesign` object
+- Check for `punching_shear_check_2d` on the `PadFoundationDesign` object
 
-1. Open the **Input Data** tab.
-2. Enter the foundation geometry, material properties, and characteristic column
-   actions.
-3. Confirm the live plan and section show the intended geometry and column position.
-4. Select **Run Design**.
-5. Review every check in **Design Results**. A satisfactory design should not contain
-   `FAIL` or `UNKNOWN` results.
-6. Review the detailed derivations in **Analytical Calculations**.
-7. Review the designed reinforcement in **Output Graph**.
-8. Use **Print / Save Calculation Report** to print the calculation sheet or save it
-   as PDF through the browser print dialogue.
+## Creating a Pad Foundation
 
-Changing an input invalidates the previous reinforcement drawing. Select **Run
-Design** again after every change.
+The creation of a `PadFoundation` instance involves the input of the following:
 
-## 4. Input Data
+1.  Foundation Length in mm
+2.  Foundation Width in mm
+3.  Column Length in mm
+4.  Column Width in mm
+5.  The position of the column along x direction from the origin in mm
+6.  The position of the column along y direction from the origin in mm
+7.  The soil bearing capacity in kN/mm2
 
-### 4.1 Geometry and layout
+        from foundationdesign import PadFoundation,padFoundationDesign
+        fdn = PadFoundation(foundation_length=2500,foundation_width=2500,column_length=400,column_width=400,col_pos_xdir=1250,col_pos_ydir=1250,soil_bearing_capacity=200)
 
-All geometry values are entered in millimetres.
+## Assigning Foundation Loads
 
-- **Foundation length:** overall dimension in the global X direction.
-- **Foundation width:** overall dimension in the global Y direction.
-- **Column length:** column dimension parallel to foundation X.
-- **Column width:** column dimension parallel to foundation Y.
-- **Column centre, X:** distance from the foundation's left edge to the column centre.
-- **Column centre, Y:** distance from the foundation's lower edge to the column centre.
-- **Foundation thickness:** overall pad depth.
-- **Soil depth above foundation:** soil thickness carried on top of the pad. Enter
-  zero where none is present.
+Soil self weight and concrete self weight can be added to the Foundation by specifying the Foundation thickness in
+mm and the soil depth above the Foundation in mm. A default value of 18kN/mm&#x00B3; and 24kN/mm&#x00B3; has been specified
+for soil unit weight and concrete unit weight respectively
 
-For a centrally positioned column:
+    fdn.foundation_loads(foundation_thickness=650,soil_depth_abv_foundation=0,soil_unit_weight=18,concrete_unit_weight=24)
 
-```text
-Column centre X = foundation length / 2
-Column centre Y = foundation width / 2
-```
+## Assigning Column Loads
 
-### 4.2 Soil and material properties
+Axial loads, horizontal loads in x and y direction, moments in x and y direction
+can all be added to the pad foundation for permanent,imposed and wind load cases.
 
-- **Soil bearing capacity (kN/m²):** allowable service bearing pressure supplied by
-  the geotechnical engineer. Confirm whether the project value is gross or net and
-  that its basis agrees with the calculation method.
-- **Soil unit weight (kN/m³):** unit weight of soil above the foundation.
-- **Concrete unit weight (kN/m³):** normally approximately 24–25 kN/m³ for reinforced
-  concrete.
-- **Concrete strength, fck (N/mm²):** characteristic cylinder compressive strength.
-- **Steel yield strength, fyk (N/mm²):** characteristic reinforcement strength.
-- **Concrete cover (mm):** nominal cover to the outside of the lowest reinforcement.
-- **Initial bar diameter X/Y (mm):** diameters used to determine the effective depths.
-  The provision routine may select a different diameter to satisfy the required area.
+    fdn.column_axial_loads(permanent_axial_load=800,imposed_axial_load=300)
 
-Supported concrete strengths are 16, 20, 25, 30, 32, 35, 37, 40, 45, and 55 N/mm².
-Supported bar diameters are 8, 10, 12, 16, 20, 25, 32, and 40 mm.
+## Designing a pad foundation
 
-### 4.3 Applied column loads and moments
+To design the foundation the `PadFoundation` must first be created as done above
+this would then be included when creating the `padFoundationDesign` object
+The creation of this object includes the following:
 
-Enter characteristic actions at foundation level. Do not add foundation self-weight
-or soil-above-foundation weight to the column axial-load fields; the program adds
-these separately.
+1.  PadFoundation object created
+2.  Characteristic compressive cylinder strength in N/mm2. Accepted range of values [16,20,25,30,32,35,37,40,45,55]
+3.  Characteristic yield strength of reinforcement in N/mm2
+4.  Nominal cover to foundation in mm
+5.  Initial assumed bar diameter of the foundation in the x direction in mm. Accepted range of values [8,10,12,16,20,25,32,40]
+    used to calculate depth to tension reinforcement along the x direction
+6.  Initial assumed bar diameter of the foundation in the y direction in mm Accepted range of values [8,10,12,16,20,25,32,40]
+    used to calculate depth to tension reinforcement along the y direction
 
-- **Permanent axial load, Gk (kN):** dead-load column reaction, including permanent
-  structural and fixed non-structural loads.
-- **Imposed axial load, Qk (kN):** variable/live-load column reaction.
-- **Permanent/imposed horizontal load X/Y (kN):** characteristic horizontal column
-  reactions in each global direction.
-- **Permanent/imposed moment X/Y (kNm):** characteristic column moments about the
-  corresponding axes.
+        fdn_design = padFoundationDesign(fdn, fck=30, fyk=500, concrete_cover=40, bar_diameterX=16, bar_diameterY=16)
 
-The main ULS combination used by the program is generally:
+## Plotting Foundation forces
 
-```text
-Ed = 1.35 × permanent action + 1.50 × imposed action
-```
+Lots of checks can be done on the Foundation which can be found in the notebooks contained in the examples folder
+To show the bending moment of the Foundation. The `plot_bending_moment_X()` can be called this figure will show the
+bending moment values at the critical location along the Foundation length or width. Plotting methods takes a show_plot argument which can either be True or False. which by default is True
 
-Use a consistent sign convention for moments and horizontal actions. Verify that the
-X/Y axes used by the source structural analysis correspond to the program layout.
+    fdn_design.plot_bending_moment_X()
+    fdn_design.plot_shear_force_X()
 
-## 5. Program tabs
+This outputs the bending moment plot with the design bending moment shown at the face of the column
+![Image](https://github.com/kunle009/FoundationDesign/blob/main/assets/bending_moment1.png?raw=true)
+The shear force plot is also displayed with critical shearforce showing at 1d from column the face
+![Image](https://github.com/kunle009/FoundationDesign/blob/main/assets/shear_force.jpg?raw=true)
 
-### Input Data
+## Installing the package
 
-Contains the input fields and live geometry-only plan and section previews. Red or
-warning messages identify invalid dimensions or material selections.
+If you want to install the `FoundationDesign` package, you run this one-liner:
 
-### Design Results
+    pip install FoundationDesign
 
-Contains derived values and a summary of all verification checks:
+**NOTE**: You need Python 3 to install this package (you may need to write `pip3` instead of `pip`).
 
-- `PASS`: calculated demand does not exceed resistance.
-- `FAIL`: calculated demand exceeds resistance; revise the design.
-- `UNKNOWN`: insufficient values were exposed to classify the result; investigate
-  before using the design.
+The library dependencies are listed in the file `requirements.txt`, but you only need to look at them if you clone the repository.
+If you install the package via `pip`, the listed dependencies should be installed automatically. You need a minimum of python version 3.8 to use this library.
 
-### Analytical Calculations
+## Interactive desktop calculator
 
-Shows formulas, numerical substitutions, resistances, utilization ratios, and
-intermediate results. The search box can locate terms such as `VEd`, `As,req`,
-`punching`, or `sliding`.
+For an input form instead of editing Python source code, run the included GUI from the project folder:
 
-### Output Graph
+    python pad_foundation_gui.py
 
-Shows the designed reinforcement after calculation:
+It provides fields for the foundation geometry, soil and material properties, design loads and moments. Select **Run design** to validate the entries and view bearing, flexural reinforcement, shear, punching and sliding checks in the Results tab. The prefilled values reproduce the concentric pad-foundation example; **Restore example** resets the form.
 
-- red lines: X-direction bottom reinforcement;
-- green lines/circles: Y-direction bottom reinforcement;
-- **X LOWER:** X bars form the lower bottom layer;
-- **Y UPPER:** Y bars form the upper bottom layer.
+## Future Works
 
-Bar callouts use notation such as `H16mm @ 200 mm c/c`.
+The following are areas that will be implemented in future:
 
-## 6. Design checks
-
-- **Bearing pressure (SLS):** compares maximum service pressure with allowable soil
-  pressure.
-- **Flexural reinforcement X/Y:** compares required and provided steel per metre.
-- **Transverse shear X/Y:** checks one-way shear at one effective depth from the
-  corresponding column faces.
-- **Punching shear at column face:** checks maximum punching resistance adjacent to
-  the column.
-- **Punching shear at 1d and 2d:** checks punching stress on the calculated control
-  perimeters.
-- **Sliding resistance:** compares the resultant factored horizontal action with the
-  calculated interface-friction resistance.
-
-Utilization is normally reported as:
-
-```text
-η = demand / resistance
-```
-
-`η ≤ 1.000` passes; `η > 1.000` fails.
-
-## 7. Revising a failed design
-
-Depending on the governing check, typical engineering responses include:
-
-- bearing failure: increase plan dimensions or reassess the allowable pressure;
-- flexural failure: increase reinforcement or foundation depth;
-- one-way or punching-shear failure: increase foundation depth and rerun the design;
-- sliding failure: investigate increased dead load, a shear key, revised interface
-  parameters, or another engineered resistance mechanism.
-
-Do not change values merely to obtain `PASS`. Revisions must be compatible with the
-geotechnical report, detailing rules, constructability, durability, and applicable
-codes.
-
-## 8. Printing and saving
-
-After running the design:
-
-1. Open **Design Results**.
-2. Select **Print / Save Calculation Report**.
-3. In the browser print dialogue, select a printer or **Save as PDF**.
-
-The report includes inputs, derived values, the check summary, and detailed
-analytical calculations. Review the PDF before issue.
-
-## 9. Important limitations
-
-- Confirm all loads, axes, signs, units, material properties, cover, and soil values.
-- The program does not replace project-specific geotechnical assessment.
-- Check reinforcement anchorage, laps, development length, edge detailing, local
-  column transfer, durability, crack control, construction tolerances, and any
-  seismic requirements separately where applicable.
-- Numerical values can differ slightly from hand calculations because the program
-  rounds some intermediate results.
-- Final calculations and drawings should be reviewed and approved by a qualified
-  engineer before construction.
+- [ ] PDF report generation
+- [x] User documentation
+- [ ] A comprehensive web app for analysis and design of foundations
+- [ ] Strip Footing Design (Eurocode 2)
+- [ ] Strap Footing Design (Eurocode 2)
+- [ ] API Support
