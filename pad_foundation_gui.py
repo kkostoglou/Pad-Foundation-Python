@@ -134,6 +134,7 @@ class PadFoundationApp(tk.Tk):
         self.field_labels = {name: label for name, label, _ in FIELDS}
         self.diagram_values: dict[str, float] | None = None
         self.reinforcement_results: dict[str, dict] | None = None
+        self.action_diagrams: dict[str, object] = {}
         self.last_summary_params: list[tuple[str, str, str]] = []
         self.last_checks: list[tuple[str, str, str, str]] = []
         self.last_trace = ""
@@ -292,21 +293,25 @@ class PadFoundationApp(tk.Tk):
         self.input_section_canvas.grid(row=0, column=0, sticky="nsew")
         self.input_section_canvas.bind("<Configure>", self._redraw_foundation_views)
 
-        # --- OUTPUT GRAPH TAB (reinforced plan and section) ---
+        # --- OUTPUT GRAPH TAB (reinforcement and analysed action diagrams) ---
         output_graph.columnconfigure(0, weight=1)
         output_graph.rowconfigure(0, weight=0)
         output_graph.rowconfigure(1, weight=1)
         ttk.Label(
             output_graph,
             text=(
-                "Foundation layout and X-X section. Reinforcement is populated "
-                "after running the design."
+                "Foundation reinforcement, bending moments and shear forces. "
+                "The analysed diagrams are populated after running the design."
             ),
             foreground="#444444",
         ).grid(row=0, column=0, sticky="w", pady=(0, 8))
 
-        preview_container = ttk.Frame(output_graph)
-        preview_container.grid(row=1, column=0, sticky="nsew")
+        graph_notebook = ttk.Notebook(output_graph)
+        graph_notebook.grid(row=1, column=0, sticky="nsew")
+        self.graph_notebook = graph_notebook
+
+        preview_container = ttk.Frame(graph_notebook, padding=6)
+        graph_notebook.add(preview_container, text="Reinforcement")
         preview_container.columnconfigure(0, weight=1)
         preview_container.rowconfigure(0, weight=1)
         preview_container.rowconfigure(1, weight=1)
@@ -328,6 +333,29 @@ class PadFoundationApp(tk.Tk):
         self.section_canvas = tk.Canvas(section_frame, background="white", highlightthickness=1, highlightbackground="#d0d0d0")
         self.section_canvas.grid(row=0, column=0, sticky="nsew")
         self.section_canvas.bind("<Configure>", self._redraw_foundation_views)
+
+        self.action_canvases: dict[str, tk.Canvas] = {}
+        for key, tab_text in (
+            ("moment_x", "Moment X"),
+            ("moment_y", "Moment Y"),
+            ("shear_x", "Shear X"),
+            ("shear_y", "Shear Y"),
+        ):
+            diagram_tab = ttk.Frame(graph_notebook, padding=6)
+            diagram_tab.columnconfigure(0, weight=1)
+            diagram_tab.rowconfigure(0, weight=1)
+            graph_notebook.add(diagram_tab, text=tab_text)
+            diagram_canvas = tk.Canvas(
+                diagram_tab, background="white", highlightthickness=1,
+                highlightbackground="#d0d0d0",
+            )
+            diagram_canvas.grid(row=0, column=0, sticky="nsew")
+            diagram_canvas.bind(
+                "<Configure>",
+                lambda _event, diagram_key=key: self._draw_action_diagram(diagram_key),
+            )
+            self.action_canvases[key] = diagram_canvas
+            self._draw_diagram_placeholder(diagram_canvas)
 
         for name, variable in self.variables.items():
             variable.trace_add("write", lambda *_args, field=name: self._on_input_changed(field))
@@ -547,6 +575,9 @@ class PadFoundationApp(tk.Tk):
     def _on_input_changed(self, field: str) -> None:
         self._set_entry_valid(self.entries[field])
         self.reinforcement_results = None
+        self.action_diagrams = {}
+        for canvas in getattr(self, "action_canvases", {}).values():
+            self._draw_diagram_placeholder(canvas)
         self._update_plan_from_inputs()
 
     def _scroll_input_form(self, event: tk.Event) -> str | None:
@@ -839,7 +870,20 @@ class PadFoundationApp(tk.Tk):
                 moment_x, moment_y, val_x, val_y, checks, moment_traces,
             )
             self.diagram_values = v
+            plot_methods = {
+                "moment_x": "plot_bending_moment_X",
+                "moment_y": "plot_bending_moment_Y",
+                "shear_x": "plot_shear_force_X",
+                "shear_y": "plot_shear_force_Y",
+            }
+            self.action_diagrams = {
+                key: getattr(design, method)(show_plot=False)
+                for key, method in plot_methods.items()
+                if hasattr(design, method)
+            }
             self.draw_foundation_views()
+            for key in self.action_canvases:
+                self._draw_action_diagram(key)
             notebook.select(self.output_graph_tab)
         except (ValueError, AssertionError, KeyError, TypeError) as error:
             messagebox.showerror("Design Validation Failed", str(error))
@@ -2296,6 +2340,209 @@ class PadFoundationApp(tk.Tk):
         self._draw_foundation_views_on(
             self.plan_canvas, self.section_canvas, self.reinforcement_results
         )
+
+    @staticmethod
+    def _draw_diagram_placeholder(canvas: tk.Canvas) -> None:
+        canvas.delete("all")
+        canvas.create_text(
+            max(canvas.winfo_width(), 2) / 2, max(canvas.winfo_height(), 2) / 2,
+            text="Run Design to generate this diagram.", fill="#666666",
+            font=("Segoe UI", 11),
+        )
+
+    def _draw_action_diagram(self, key: str) -> None:
+        """Render the calculation library's Plotly result on a native Tk canvas."""
+        canvas = self.action_canvases.get(key)
+        figure = self.action_diagrams.get(key)
+        if canvas is None:
+            return
+        if figure is None:
+            self._draw_diagram_placeholder(canvas)
+            return
+
+        series = []
+        for trace in getattr(figure, "data", ()):
+            points = []
+            x_data = getattr(trace, "x", None)
+            y_data = getattr(trace, "y", None)
+            if x_data is None or y_data is None:
+                continue
+            for x_value, y_value in zip(x_data, y_data):
+                try:
+                    # IndeterminateBeam's default result units are N and N.m.
+                    # Match the design report by displaying kN and kNm.
+                    point = float(x_value), float(y_value) / 1000.0
+                except (TypeError, ValueError):
+                    continue
+                if all(math.isfinite(value) for value in point):
+                    points.append(point)
+            if points:
+                series.append((trace, points))
+        if not series:
+            self._draw_diagram_placeholder(canvas)
+            return
+
+        canvas.delete("all")
+        width, height = max(canvas.winfo_width(), 480), max(canvas.winfo_height(), 300)
+        # Leave room above the graph for an elevation aligned to the analysis axis.
+        left, right, top, bottom = 78, 24, 100, 58
+        plot_width, plot_height = width - left - right, height - top - bottom
+        xs = [x for _trace, points in series for x, _y in points]
+        ys = [y for _trace, points in series for _x, y in points]
+        x_min, x_max = min(xs), max(xs)
+        y_min, y_max = min(min(ys), 0.0), max(max(ys), 0.0)
+        if x_min == x_max:
+            x_min, x_max = x_min - 0.5, x_max + 0.5
+        if y_min == y_max:
+            y_min, y_max = y_min - 0.5, y_max + 0.5
+        padding = (y_max - y_min) * 0.08
+        y_min, y_max = y_min - padding, y_max + padding
+
+        sx = lambda value: left + (value - x_min) * plot_width / (x_max - x_min)
+        sy = lambda value: top + (y_max - value) * plot_height / (y_max - y_min)
+
+        # Show where the action diagram sits on the actual pad.  Positions are
+        # calculated as proportions, so this remains aligned whether the library
+        # returns its horizontal axis in metres or millimetres.
+        values = self.diagram_values or {}
+        if key.endswith("_x"):
+            pad_size = values.get("foundation_length")
+            column_size = values.get("column_length")
+            column_position = values.get("col_pos_xdir")
+            direction = "X"
+        else:
+            pad_size = values.get("foundation_width")
+            column_size = values.get("column_width")
+            column_position = values.get("col_pos_ydir")
+            direction = "Y"
+        if all(
+            isinstance(value, (int, float)) and value > 0
+            for value in (pad_size, column_size, column_position)
+        ):
+            column_left = left + (
+                (column_position - column_size / 2) / pad_size
+            ) * plot_width
+            column_right = left + (
+                (column_position + column_size / 2) / pad_size
+            ) * plot_width
+            slab_top, slab_bottom = 69, 81
+            canvas.create_rectangle(
+                left, slab_top, left + plot_width, slab_bottom,
+                fill="#d9eaf7", outline="#1f4e79", width=2,
+            )
+            canvas.create_rectangle(
+                column_left, 43, column_right, slab_top,
+                fill="#c7d9e7", outline="#1f4e79", width=2,
+            )
+            canvas.create_line(
+                column_position / pad_size * plot_width + left, 39,
+                column_position / pad_size * plot_width + left, 86,
+                fill="#d62728", dash=(4, 3),
+            )
+            canvas.create_text(
+                (column_left + column_right) / 2, 34,
+                text="Column", fill="#1f4e79", font=("Segoe UI", 8),
+            )
+            canvas.create_text(
+                left + plot_width - 4, 61, text=f"Pad foundation — {direction}",
+                anchor="e", fill="#1f4e79", font=("Segoe UI", 8, "bold"),
+            )
+
+        for index in range(6):
+            fraction = index / 5
+            x_value = x_min + fraction * (x_max - x_min)
+            y_value = y_max - fraction * (y_max - y_min)
+            canvas.create_line(sx(x_value), top, sx(x_value), top + plot_height, fill="#eceff1")
+            canvas.create_line(left, sy(y_value), left + plot_width, sy(y_value), fill="#eceff1")
+            canvas.create_text(sx(x_value), top + plot_height + 16, text=f"{x_value:g}", fill="#555555")
+            canvas.create_text(left - 8, sy(y_value), text=f"{y_value:.3g}", anchor="e", fill="#555555")
+        canvas.create_line(left, sy(0), left + plot_width, sy(0), fill="#606060", width=2)
+        canvas.create_rectangle(left, top, left + plot_width, top + plot_height, outline="#8a8a8a")
+
+        colours = ("#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#ff7f0e")
+        for index, (trace, points) in enumerate(series):
+            colour = colours[index % len(colours)]
+            coords = [value for x, y in points for value in (sx(x), sy(y))]
+            mode = str(getattr(trace, "mode", "lines") or "lines")
+            if "lines" in mode and len(points) > 1:
+                canvas.create_line(*coords, fill=colour, width=2)
+            if "markers" in mode or len(points) == 1:
+                for x, y in points:
+                    canvas.create_oval(sx(x)-3, sy(y)-3, sx(x)+3, sy(y)+3, fill=colour, outline=colour)
+
+        # Label the structural values at both pad ends and column faces.  Use the
+        # longest trace as the analysed action curve; shorter traces in the Plotly
+        # figure are normally query-point markers or annotations.
+        if all(
+            isinstance(value, (int, float)) and value > 0
+            for value in (pad_size, column_size, column_position)
+        ):
+            _main_trace, main_points = max(series, key=lambda item: len(item[1]))
+            ordered_points = sorted(main_points)
+
+            def value_at(position: float) -> float:
+                """Linearly read the plotted action at a requested position."""
+                closest_x, closest_y = min(
+                    ordered_points, key=lambda point: abs(point[0] - position)
+                )
+                tolerance = max((x_max - x_min) * 1e-7, 1e-9)
+                if abs(closest_x - position) <= tolerance:
+                    return closest_y
+                for (x1, y1), (x2, y2) in zip(
+                    ordered_points, ordered_points[1:]
+                ):
+                    if x1 <= position <= x2 and x2 != x1:
+                        ratio = (position - x1) / (x2 - x1)
+                        return y1 + ratio * (y2 - y1)
+                return closest_y
+
+            left_face = x_min + (
+                (column_position - column_size / 2) / pad_size
+            ) * (x_max - x_min)
+            right_face = x_min + (
+                (column_position + column_size / 2) / pad_size
+            ) * (x_max - x_min)
+            stations = (
+                ("Left end", x_min, "sw"),
+                ("Left face", left_face, "s"),
+                ("Right face", right_face, "n"),
+                ("Right end", x_max, "se"),
+            )
+            for station_index, (label, position, anchor) in enumerate(stations):
+                action = value_at(position)
+                px, py = sx(position), sy(action)
+                canvas.create_line(px, top, px, top + plot_height, fill="#9e9e9e", dash=(3, 3))
+                canvas.create_oval(
+                    px - 4, py - 4, px + 4, py + 4,
+                    fill="#ffffff", outline="#c5221f", width=2,
+                )
+                # Alternate face labels above/below the curve to avoid overlap
+                # where moment and shear values are close together.
+                offset = -12 if station_index in (0, 1) else 12
+                label_y = min(max(py + offset, top + 13), top + plot_height - 13)
+                canvas.create_text(
+                    px, label_y,
+                    text=f"{label}\n{action:.3f}",
+                    anchor=anchor, justify="center", fill="#8b0000",
+                    font=("Segoe UI", 8, "bold"),
+                )
+
+        layout = getattr(figure, "layout", None)
+        title = getattr(getattr(layout, "title", None), "text", None) or {
+            "moment_x": "Bending moment diagram — X direction",
+            "moment_y": "Bending moment diagram — Y direction",
+            "shear_x": "Shear force diagram — X direction",
+            "shear_y": "Shear force diagram — Y direction",
+        }[key]
+        title = html.unescape(re.sub(r"<[^>]+>", "", str(title)))
+        axis_title = getattr(getattr(layout, "xaxis", None), "title", None)
+        x_title = getattr(axis_title, "text", None) or "Foundation position"
+        if "(" not in x_title:
+            x_title = f"{x_title} (m)"
+        y_title = "Bending moment (kNm)" if key.startswith("moment") else "Shear force (kN)"
+        canvas.create_text(width/2, 20, text=title, font=("Segoe UI", 11, "bold"), fill="#1f4e79")
+        canvas.create_text(left + plot_width/2, height-16, text=x_title, fill="#333333")
+        canvas.create_text(18, top + plot_height/2, text=y_title, angle=90, fill="#333333")
 
     def _draw_foundation_views_on(
         self,
